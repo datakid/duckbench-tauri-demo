@@ -1,0 +1,29 @@
+[package]
+name = "duckbench"
+version = "1.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+default = []
+updater = ["dep:tauri-plugin-updater"]
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = { version = "2", optional = true }
+serde_json = { version = "1", features = ["preserve_order"] }
+duckdb = { version = "1", features = ["bundled", "json", "parquet"] }
+calamine = { version = "0.26", features = ["dates"] }
+rust_xlsxwriter = { version = "0.80", features = ["constant_memory"] }
+chrono = "0.4"
+urlencoding = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

@@ -1,0 +1,15 @@
+{
+  "bundle": {
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "signCommand": "trusted-signing-cli -e %AZURE_SIGNING_ENDPOINT% -a %AZURE_SIGNING_ACCOUNT% -c %AZURE_SIGNING_PROFILE% -d Duckbench %1"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "REPLACE_WITH_THE_PUBLIC_KEY_FROM_npm_run_updater-key",
+      "endpoints": ["https://github.com/REPLACE_OWNER/REPLACE_REPO/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

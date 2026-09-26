@@ -1,0 +1,15 @@
+{
+  "name": "duckbench-desktop",
+  "private": true,
+  "version": "1.1.0",
+  "scripts": {
+    "icons": "tauri icon app-icon.svg",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:release": "tauri build --config src-tauri/tauri.release.conf.json --features updater",
+    "updater-key": "tauri signer generate -w ~/.tauri/duckbench.key"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
