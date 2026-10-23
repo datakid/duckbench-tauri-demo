@@ -1,0 +1,70 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check web entry points
+        run: |
+          test -s app/src/index.html
+          test -s app/src/vendor/xlsx-0.20.3.full.min.js
+          node --check app/src/platform/desktop.js
+
+  desktop:
+    name: Desktop installer (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Generate icons
+        run: npm run icons
+
+      - name: Build installer
+        run: npm run build
+
+      - name: List bundle output
+        shell: bash
+        run: ls -la src-tauri/target/release/bundle/nsis
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: duckbench-windows-installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 14

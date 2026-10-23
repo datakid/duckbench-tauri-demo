@@ -1,0 +1,129 @@
+name: Pre-alpha release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to release (created on the selected branch if it does not exist)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Resolve version from tag
+        id: ver
+        shell: bash
+        run: |
+          VERSION="${TAG#v}"
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "Tag '$TAG' is not a valid version (expected e.g. v0.1.0-alpha.1)" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if echo "$VERSION" | grep -q '-'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stamp version into app config
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const f = 'src-tauri/tauri.conf.json';
+            const c = JSON.parse(fs.readFileSync(f, 'utf8'));
+            c.version = process.env.VERSION;
+            fs.writeFileSync(f, JSON.stringify(c, null, 2) + '\n');
+          "
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Generate icons
+        run: npm run icons
+
+      - name: Build installer
+        run: npm run build
+
+      - name: Collect installer and checksum
+        id: pack
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp src-tauri/target/release/bundle/nsis/*.exe dist/
+          cd dist
+          for f in *.exe; do
+            sha256sum "$f" > "$f.sha256"
+          done
+          ls -la
+          echo "installer=$(ls *.exe | head -n 1)" >> "$GITHUB_OUTPUT"
+
+      - name: Write release notes
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          PRERELEASE: ${{ steps.ver.outputs.prerelease }}
+          INSTALLER: ${{ steps.pack.outputs.installer }}
+        run: |
+          {
+            if [ "$PRERELEASE" = "true" ]; then
+              echo "**Pre-alpha — for testing only.** Expect bugs and breaking changes. Back up any data you care about."
+              echo
+            fi
+            echo "Windows installer: \`$INSTALLER\` (per-user install, no admin rights needed)."
+            echo
+            echo "This build is **not code-signed**, so Windows SmartScreen will show a warning. Choose *More info* then *Run anyway*. The SHA-256 checksum is attached for verification."
+            echo
+            echo "Duckbench runs entirely on your PC. Your data never leaves it."
+          } > notes.md
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          PRERELEASE: ${{ steps.ver.outputs.prerelease }}
+        run: |
+          FLAGS=""
+          if [ "$PRERELEASE" = "true" ]; then FLAGS="--prerelease"; fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --target "$GITHUB_SHA" \
+              --title "Duckbench $VERSION" \
+              --notes-file notes.md \
+              --generate-notes \
+              $FLAGS
+          fi
