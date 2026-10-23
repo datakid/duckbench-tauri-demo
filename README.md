@@ -15,8 +15,8 @@ src-tauri/src/xlsx_out.rs           streaming XLSX writer (rust_xlsxwriter, cons
 src-tauri/src/values.rs             DuckDB value → JSON (same shapes the UI already uses)
 src-tauri/src/proto.rs              length-prefixed frames over the pipes
 src-tauri/tauri.release.conf.json   signing + updater settings for release builds
-.github/workflows/windows.yml       CI build (unsigned installer artifact)
-.github/workflows/release.yml       tagged, signed release with updater manifest
+.github/workflows/windows.yml       CI: web file check + Windows installer build on every push and PR
+.github/workflows/release.yml       tag push (v*) builds the installer and publishes a GitHub release
 ```
 
 ## Build
@@ -26,11 +26,24 @@ src-tauri/tauri.release.conf.json   signing + updater settings for release build
 
 The first build compiles DuckDB from source, which takes several minutes. Builds after that are cached.
 
-### Signed release with auto-update
+## CI and pre-alpha releases
+**CI** (`windows.yml`) runs on every push to `main`, every pull request, and on demand. The `web` job checks that the browser version's files are intact. The `desktop` job builds the NSIS installer on a Windows runner and uploads it as the `duckbench-windows-installer` artifact (kept 14 days). The first run compiles DuckDB from source and takes a while; later runs use the Rust cache.
+
+**Releases** (`release.yml`) build the same installer and publish it on the repository's Releases page, with a SHA-256 checksum file. Push a tag to start one:
+```
+git tag v0.1.0-alpha.1
+git push origin v0.1.0-alpha.1
+```
+- The version in the tag is written into the installer at build time, so you don't edit version numbers by hand.
+- A tag with a suffix (`-alpha.1`, `-beta.1`, `-rc.1`) is published as a **pre-release**. A plain tag like `v0.1.0` is a normal release.
+- It can also be started from the Actions tab (**Run workflow**) with a tag name.
+- These builds are **unsigned and have no auto-update**. Windows SmartScreen shows a warning on first run.
+
+### Signed release with auto-update (later)
+`release.yml` does not sign or publish `latest.json` yet. These steps prepare for it; `npm run build:release` uses them locally.
 1. `npm run updater-key` creates a key pair. Put the public key in `src-tauri/tauri.release.conf.json`, and store the private key and its password as the GitHub secrets `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 2. In the same file, replace `REPLACE_OWNER/REPLACE_REPO` with your GitHub repository.
 3. For Azure Trusted Signing (removes the SmartScreen warning), set the secrets `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` and the variables `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`, `AZURE_SIGNING_PROFILE`.
-4. Push a tag such as `v1.1.0`. The release workflow builds, signs and uploads a draft release with `latest.json`. Once you publish it, installed apps offer the update about 4 seconds after they start.
 
 Local release build: `npm run build:release`. Plain `npm run build` includes no updater and needs no keys.
 

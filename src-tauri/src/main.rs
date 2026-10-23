@@ -100,8 +100,10 @@ fn atomic_write(dest: &Path, bytes: &[u8]) -> Result<(), String> {
     let mut tmp = dest.as_os_str().to_owned();
     tmp.push(".partial");
     let tmp = PathBuf::from(tmp);
-    fs::write(&tmp, bytes).map_err(es)?;
-    fs::File::open(&tmp).and_then(|f| f.sync_all()).map_err(es)?;
+    let mut f = fs::File::create(&tmp).map_err(es)?;
+    f.write_all(bytes).map_err(es)?;
+    f.sync_all().map_err(es)?;
+    drop(f);
     fs::rename(&tmp, dest).map_err(|e| {
         let _ = fs::remove_file(&tmp);
         es(e)
@@ -116,7 +118,7 @@ fn atomic_move(src: &Path, dest: &Path) -> Result<(), String> {
     tmp.push(".partial");
     let tmp = PathBuf::from(tmp);
     fs::copy(src, &tmp).map_err(es)?;
-    fs::File::open(&tmp).and_then(|f| f.sync_all()).map_err(es)?;
+    fs::OpenOptions::new().write(true).open(&tmp).and_then(|f| f.sync_all()).map_err(es)?;
     fs::rename(&tmp, dest).map_err(|e| {
         let _ = fs::remove_file(&tmp);
         es(e)
