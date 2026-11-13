@@ -19,6 +19,14 @@ fn sql_path(p: &Path) -> String {
     sql_str(&p.display().to_string())
 }
 
+fn dir_path(p: &Path) -> String {
+    let mut s = p.display().to_string();
+    if !s.ends_with(std::path::MAIN_SEPARATOR) {
+        s.push(std::path::MAIN_SEPARATOR);
+    }
+    sql_str(&s)
+}
+
 fn base_sql(spill: &Path, threads: usize) -> Vec<String> {
     vec![
         format!("SET temp_directory='{}'", sql_path(spill)),
@@ -32,10 +40,10 @@ fn base_sql(spill: &Path, threads: usize) -> Vec<String> {
 fn lockdown_sql(work: &Path, spill: &Path, cache: &Path) -> Vec<String> {
     vec![
         format!(
-            "SET allowed_directories=['{}\\', '{}\\', '{}\\']",
-            sql_path(work),
-            sql_path(spill),
-            sql_path(cache)
+            "SET allowed_directories=['{}', '{}', '{}']",
+            dir_path(work),
+            dir_path(spill),
+            dir_path(cache)
         ),
         "SET enable_external_access=false".into(),
         "SET lock_configuration=true".into(),
