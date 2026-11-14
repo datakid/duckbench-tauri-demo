@@ -1,5 +1,7 @@
 # Duckbench — Windows desktop (Tauri 2 + native DuckDB)
 
+> **This is the legacy Duckbench desktop app.** Active development has moved to the updated Duckbench: **[github.com/datakid/duckbench](https://github.com/datakid/duckbench)** (live at [duckbench2.vercel.app](https://duckbench2.vercel.app)). It has the redesigned interface, the SQL console, step deltas, copy as SQL, share links and clean-up suggestions, and its own desktop build. This repo stays available for its native Rust engine.
+
 Duckbench is a point-and-click data-cleaning workbench (Power-Query style) that compiles every step to DuckDB SQL. This repo is the **Windows-only native desktop app**. It uses the same UI as the web version but runs a native DuckDB engine written in Rust in its own process, so it has no browser-tab limits.
 
 ## Layout
